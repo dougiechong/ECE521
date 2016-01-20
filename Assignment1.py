@@ -8,6 +8,8 @@ from pylab import scatter, show, title, xlabel, ylabel, plot, contour
 import matplotlib.pyplot as plt
 
 
+# most KNN functions obtained from here 
+#http://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/
 #euclidian distance function
 def euclideanDistance(instance1, instance2, length):
 	distance = 0
@@ -52,42 +54,6 @@ def getValidationErrors(testSet, predictions):
 		if testSet[x][-1] != predictions[x]:
 			validationErrors += 1
 	return validationErrors
-
-def fit(X, Y):
-
-    def mean(Xs):
-        return sum(Xs) / len(Xs)
-    m_X = mean(X)
-    m_Y = mean(Y)
-
-    def std(Xs, m):
-        normalizer = len(Xs) - 1
-        return math.sqrt(sum((pow(x - m, 2) for x in Xs)) / normalizer)
-    # assert np.round(Series(X).std(), 6) == np.round(std(X, m_X), 6)
-
-    def pearson_r(Xs, Ys):
-
-        sum_xy = 0
-        sum_sq_v_x = 0
-        sum_sq_v_y = 0
-
-        for (x, y) in zip(Xs, Ys):
-            var_x = x - m_X
-            var_y = y - m_Y
-            sum_xy += var_x * var_y
-            sum_sq_v_x += pow(var_x, 2)
-            sum_sq_v_y += pow(var_y, 2)
-        return sum_xy / math.sqrt(sum_sq_v_x * sum_sq_v_y)
-    # assert np.round(Series(X).corr(Series(Y)), 6) == np.round(pearson_r(X, Y), 6)
-
-    r = pearson_r(X, Y)
-
-    b = r * (std(Y, m_Y) / std(X, m_X))
-    A = m_Y - b * m_X
-
-    def line(x):
-        return b * x + A
-    return line
 
 train_x = np.linspace(1.0, 10.0, num=100)[:, np.newaxis]
 train_y = np.sin(train_x) + 0.1*np.power(train_x, 2) + 0.5*np.random.randn(100, 1)
@@ -151,22 +117,89 @@ print "K   Validation Errors"
 for i in range(len(validation_errors)):
 	print str(k_values[i]) + "   " + str(validation_errors[i])
 
-a = np.array([1])
-b = np.array([1])
+a = []
+b = []
 for i in range(len(train_x)):
-	np.append(a, train_x[i])
+	a.append(train_x[i][0])
 for i in range(len(train_y)):
-	np.append(b, train_y[i])
-print a
-t = np.arange(0.0, 1.2, 0.1)
-fit_line = np.polyfit(a, b, 1)
+	b.append(train_y[i][0])
+coeffs = np.polyfit(a, b, 1)
+coeffs_5 = np.polyfit(a, b, 5)
+'''ffit = np.poly1d(coeffs)
+ffit_5 = np.poly1d(coeffs_5)
+x_new = np.linspace(a[0], a[-1], num=len(a)*10)
 scatter(train_x, train_y, marker='o', c='b')
 title('training set')
 xlabel('train_x')
 ylabel('train_y')
-plt.plot(fit_line)
+plt.plot(x_new, ffit(x_new))
+plt.plot(x_new, ffit_5(x_new))
 plt.show()
-show()
-print t
+show()'''
+
+
+def sigmaSum(x, w, n, b, t):
+	total = 0
+	for i in range(n):
+		total += math.pow((np.dot(w, x[i]) + b - t[i][0]), 2)
+	return total
+
+learning_rate = 0.1 #try values 0.0001-0.1
+n = 200
+b = np.random.rand()
+w = np.random.rand(64) #initialize weights randomly
+#print np.dot(w, x[2])
+euclidean_cost = (1.0/(2.0*n))*sigmaSum(x, w, n, b, t)
+#print euclidean_cost
+threshold = 0.5
+
+def lin_regress(w, b, x, targ, x_eval, t_eval, T, epochs, lmbda):					
+	for i in range(epochs): #arbitrary number of epochs
+		for j in range(len(w)):
+			total_j = 0;
+			for k in range(T):
+				total_j += (targ[k][0]-np.dot(w,x[k])-b)*x[k][j]
+			total_j *= 2.0/T
+			total_j -= w[j]*lmbda
+			w[j] += learning_rate*total_j
+	validation_errors = 0
+	max_t = 0
+	min_t = 0
+	for x_ind in x_eval:
+		if(np.dot(w, x_ind)+b > max_t):
+			max_t = np.dot(w, x_ind)+b
+		if(np.dot(w, x_ind)+b < min_t):
+			min_t = np.dot(w, x_ind)+b
+	threshold = 0.5
+	for i in range(len(x_eval)):
+		if((np.dot(w, x_eval[i])+b)> threshold):
+			target = 1.0
+		else:
+			target = 0.0
+		if(t_eval[i][0] != target):
+			validation_errors += 1
+			
+	#print "error cost", (1.0/(2.0*T))*sigmaSum(x, w, n, b, targ)
+	#print T, ' ', validation_errors
+	return validation_errors
+
+#for T in [100, 200, 400, 800]:
+#	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, T, 100, 0)
+#	print T, ' ', validation_errors
+
+'''for epoch in range(50):
+	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, 50, epoch, 0)
+	training_errors = lin_regress(w, b, x, t, x[0:49], t[0:49], 50, epoch, 0)
+	print 'epoch', epoch, ' validation errors: ', validation_errors
+	print 'epoch', epoch, ' training errors: ', training_errors'''
+
+for lmbda in [0, 0.0001, 0.001, 0.01, 0.1, 0.5]:
+	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, 50, 100, lmbda)
+	print 'lmbda', lmbda, ' validation errors: ', validation_errors
+
+
+
+
+#find gradient, adjust w and b until euclidean cost is minimized
 
 
