@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 # most KNN functions obtained from here 
 #http://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/
 #euclidian distance function
+#use numpy.broadcasts
 def euclideanDistance(instance1, instance2, length):
 	distance = 0
 	for x in range(length):
@@ -123,9 +124,11 @@ for i in range(len(train_x)):
 	a.append(train_x[i][0])
 for i in range(len(train_y)):
 	b.append(train_y[i][0])
-coeffs = np.polyfit(a, b, 1)
+
+#have to use gradient descent
+'''coeffs = np.polyfit(a, b, 1)
 coeffs_5 = np.polyfit(a, b, 5)
-'''ffit = np.poly1d(coeffs)
+ffit = np.poly1d(coeffs)
 ffit_5 = np.poly1d(coeffs_5)
 x_new = np.linspace(a[0], a[-1], num=len(a)*10)
 scatter(train_x, train_y, marker='o', c='b')
@@ -155,13 +158,12 @@ threshold = 0.5
 
 def lin_regress(w, b, x, targ, x_eval, t_eval, T, epochs, lmbda):					
 	for i in range(epochs): #arbitrary number of epochs
-		for j in range(len(w)):
-			total_j = 0;
-			for k in range(T):
+		for k in range(T):
+			for j in range(len(w)):
+				total_j = 0;
 				total_j += (targ[k][0]-np.dot(w,x[k])-b)*x[k][j]
-			total_j *= 2.0/T
-			total_j -= w[j]*lmbda
-			w[j] += learning_rate*total_j
+				total_j -= w[j]*lmbda
+				w[j] += learning_rate*total_j
 	validation_errors = 0
 	max_t = 0
 	min_t = 0
@@ -179,13 +181,12 @@ def lin_regress(w, b, x, targ, x_eval, t_eval, T, epochs, lmbda):
 		if(t_eval[i][0] != target):
 			validation_errors += 1
 			
-	#print "error cost", (1.0/(2.0*T))*sigmaSum(x, w, n, b, targ)
-	#print T, ' ', validation_errors
+	print "error cost", (1.0/(2.0*T))*sigmaSum(x, w, n, b, targ)
 	return validation_errors
 
-#for T in [100, 200, 400, 800]:
-#	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, T, 100, 0)
-#	print T, ' ', validation_errors
+for T in [100, 200, 400, 800]:
+	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, T, 100, 0)
+	print T, ' ', validation_errors
 
 '''for epoch in range(50):
 	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, 50, epoch, 0)
@@ -193,12 +194,12 @@ def lin_regress(w, b, x, targ, x_eval, t_eval, T, epochs, lmbda):
 	print 'epoch', epoch, ' validation errors: ', validation_errors
 	print 'epoch', epoch, ' training errors: ', training_errors'''
 
-for lmbda in [0, 0.0001, 0.001, 0.01, 0.1, 0.5]:
+'''for lmbda in [0, 0.0001, 0.001, 0.01, 0.1, 0.5]:
 	validation_errors = lin_regress(w, b, x, t, x_eval, t_eval, 50, 100, lmbda)
-	print 'lmbda', lmbda, ' validation errors: ', validation_errors
+	print 'lmbda', lmbda, ' validation errors: ', validation_errors'''
 
 
-
+#reccommends 10 000 epochs
 
 #find gradient, adjust w and b until euclidean cost is minimized
 
