@@ -52,6 +52,7 @@ def getValidationErrors(testSet, predictions):
 	return validationErrors
 
 def stochasticGradientDescent(x, y, theta, alpha, m, numIterations, lmbda, val=False):
+	m = len(x)
 	#go through number of iterations
 	for i in range(numIterations):
 		#go though each sample
@@ -63,7 +64,7 @@ def stochasticGradientDescent(x, y, theta, alpha, m, numIterations, lmbda, val=F
 			gradient += lmbda*theta
 			cost = np.sum(loss ** 2) / (2 * m) + (lmbda/2.0) * np.dot(theta, theta)
 			#print("Iteration %d | Cost: %f" % (i*len(loss)+j, cost))
-			theta -= alpha * (2.0*gradient)/m 
+			theta -= alpha * gradient
 		if((val == True) and (i%100==0)):
 			validationErrors = validateSet(x_eval, t_eval, theta)
 			if(i==0):
@@ -170,9 +171,8 @@ def linRegress(x, targ, x_eval, t_eval, T, epochs, lmbda, val=False):
 	x_new = addOnes(x)
 	m, n = np.shape(x_new) 
 	w = np.random.rand(n)
-	
 	#perform stochastic gradient descent
-	w = stochasticGradientDescent(x_new[0:T], targ.flatten()[0:T], w, 0.1, m, epochs, lmbda, val)
+	w = stochasticGradientDescent(x_new[0:T], targ.flatten()[0:T], w, 0.001, m, epochs, lmbda, val)
 	'''validation_errors = 0
 	threshold = 0.5
 	x_eval = addOnes(x_eval)
@@ -232,8 +232,8 @@ def task5():
 
 def task6():
 	validation_errors = linRegress(x, t, x_eval, t_eval, 50, 10000, 0, True)
-	title('errors vs enoch')
-	xlabel('enoch')
+	title('errors vs epoch')
+	xlabel('epoch')
 	ylabel('errors')
 	plt.legend(loc='upper right')
 	plt.show()	
