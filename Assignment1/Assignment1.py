@@ -214,7 +214,7 @@ def genDataFive(numPoints, bias, variance, train_x, train_y):
 	return x, y
 
 numIterations= 10000
-alpha = 0.01	
+alpha = 0.0005
 	
 def task3():
 	x, y = genData(100, 25, 10, train_x, train_y)
@@ -253,7 +253,7 @@ def task7():
 #task1()
 #task2()
 #task3()
-#task4()
+task4()
 #task5()
 #task6()
 #task7()
