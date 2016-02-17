@@ -51,6 +51,7 @@ def task1(num_h_units, learning_rate, num_layers, dropout):
     train_errors = []
     val_errors = []
     epochs = []
+    min_cost = 1000000
     
     graph = tf.Graph()
     with graph.as_default():
@@ -137,15 +138,25 @@ def task1(num_h_units, learning_rate, num_layers, dropout):
             log_likelihood.append(-l)
             val_log_likelihood.append(-vl)
             train_errors.append(get_errors(predictions, batch_labels))
-            val_errors.append(get_errors(valid_prediction.eval(), val_labels))
+            val_error = get_errors(valid_prediction.eval(), val_labels)
+            val_errors.append(val_error)
+            
             if (step % 500 == 0):
                 print("Minibatch loss at step %d: %f" % (step, l))
                 print("Minibatch accuracy: %.1f%%" % accuracy(predictions, batch_labels))
-                print("Validation accuracy: %.1f%%" % accuracy(
-                    valid_prediction.eval(), val_labels))
+            if (min_cost < val_error):
+                best_epoch = step
+                if(step>20):
+                    break
+            min_cost = val_error
+        print("Validation accuracy: %.1f%%" % accuracy(
+            valid_prediction.eval(), val_labels))        
         print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), test_labels))
         test_errors = get_errors(test_prediction.eval(), test_labels)
+        final_val_errors = get_errors(valid_prediction.eval(), val_labels)
         print("Test errors:  %d" %  test_errors)
+        print("Validation errors:  %d" %  final_val_errors)
+        print("Best Epoch:  %d" %  best_epoch)
     plot(epochs, log_likelihood, 'epoch', 'training log likelihood')
     plot(epochs, val_log_likelihood, 'epoch', 'validation log likelihood')
     plot(epochs, train_errors, 'epoch', 'training errors')
@@ -222,9 +233,9 @@ if __name__ == "__main__":
     # Subset the training data for faster turnaround.
     train_subset = 15000
     
-    task1(1000, 0.01, 0, False)
+    #task1(1000, 0.01, 0, False)
     #task2()
     #task3()
     #task4()
     #task5()
-    #task6()
+    task6()
