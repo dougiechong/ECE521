@@ -5,10 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
-import tarfile
 import tensorflow as tf
-from IPython.display import display, Image
-from scipy import ndimage
 import matplotlib.cm as cm
 from pylab import scatter, show, title, xlabel, ylabel, plot, contour
 import math
@@ -31,6 +28,9 @@ def accuracy(predictions, labels):
     return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
             / predictions.shape[0])
 
+def get_errors(predictions, labels):
+    return np.sum(np.argmax(predictions, 1) != np.argmax(labels, 1))
+
 # Model 
 def model(_X, _weights, _biases, _dropout):
     #Hidden layer with RELU activation
@@ -47,6 +47,9 @@ def task1(num_h_units, learning_rate, num_layers, dropout):
     '''main code used from http://nbviewer.jupyter.org/github/tensorflow/tensorflow/blob/master/tensorflow/examples/udacity/2_fullyconnected.ipynb'''
     batch_size = 128
     log_likelihood = []
+    val_log_likelihood = []
+    train_errors = []
+    val_errors = []
     epochs = []
     
     graph = tf.Graph()
@@ -98,6 +101,10 @@ def task1(num_h_units, learning_rate, num_layers, dropout):
         logits = model(tf_train_dataset, weights, biases, dropout)
         loss = tf.reduce_mean(
             tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
+        val_logits = model(tf_valid_dataset, weights, biases, dropout)
+        val_loss = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(val_logits, val_labels))
+        
         # Optimizer.
         if(num_layers == 0):
             optimizer = tf.train.MomentumOptimizer(0.1, 0.2).minimize(loss)
@@ -125,18 +132,31 @@ def task1(num_h_units, learning_rate, num_layers, dropout):
             # The key of the dictionary is the placeholder node of the graph to be fed,
             # and the value is the numpy array to feed to it.
             feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
-            _, l, predictions = session.run([optimizer, loss, train_prediction], feed_dict=feed_dict)
+            _, l, vl, predictions = session.run([optimizer, loss, val_loss, train_prediction], feed_dict=feed_dict)
             epochs.append(step)
             log_likelihood.append(-l)
+            val_log_likelihood.append(-vl)
+            train_errors.append(get_errors(predictions, batch_labels))
+            val_errors.append(get_errors(valid_prediction.eval(), val_labels))
             if (step % 500 == 0):
                 print("Minibatch loss at step %d: %f" % (step, l))
                 print("Minibatch accuracy: %.1f%%" % accuracy(predictions, batch_labels))
                 print("Validation accuracy: %.1f%%" % accuracy(
                     valid_prediction.eval(), val_labels))
         print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), test_labels))
-    plt.plot(epochs, log_likelihood)
-    xlabel('epochs')
-    ylabel('log_likelihood')
+        test_errors = get_errors(test_prediction.eval(), test_labels)
+        print("Test errors:  %d" %  test_errors)
+    plot(epochs, log_likelihood, 'epoch', 'training log likelihood')
+    plot(epochs, val_log_likelihood, 'epoch', 'validation log likelihood')
+    plot(epochs, train_errors, 'epoch', 'training errors')
+    plot(epochs, val_errors, 'epoch', 'validation errors')
+    
+def plot(x, y, _xlabel, _ylabel):
+    plt.plot(x, y)
+    xlabel(_xlabel)
+    ylabel(_ylabel)
+    title(_ylabel + ' vs. ' + _xlabel)
+    plt.tight_layout()
     plt.show()
     
 def task2():
@@ -202,9 +222,9 @@ if __name__ == "__main__":
     # Subset the training data for faster turnaround.
     train_subset = 15000
     
-    #task1(1000, 0.01, 0, False)
+    task1(1000, 0.01, 0, False)
     #task2()
-    task3()
+    #task3()
     #task4()
     #task5()
     #task6()
