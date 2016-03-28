@@ -9,8 +9,10 @@ def euclideanDistance(X, Y):
     XX_sum = tf.reduce_sum(XX, 1)
     YY_sum = tf.reduce_sum(YY, 1)
     #mult
+    #print(X.eval())
+    #print(Y.eval())
     XY = 2*tf.matmul(X, Y, transpose_b=True)
-    XX_reshape = tf.reshape(XX_sum, [tf.shape(XX_sum).eval()[0],1])
+    XX_reshape = tf.reshape(XX_sum, [-1,1])
     dists = tf.sub(tf.add(XX_reshape, YY_sum), XY)
 
     #print(XX.eval())
@@ -19,34 +21,13 @@ def euclideanDistance(X, Y):
     #print(YY_sum.eval())
     #print(XY.eval())
     #print(dists.eval())
-    return dists
+    #just to get shape
 
-def nump_compute_dist(a, b):
-    #square all elements of both matrices
-    a_squared = np.square(a)
-    b_squared = np.square(b)
-    #sum all squares of EACH sample
-    a_sum_square = np.sum(a_squared,axis=1)
-    b_sum_square = np.sum(b_squared,axis=1)
-    #multiply each sample by each cluster
-    mul = np.dot(a,b.T)
-    dists = a_sum_square[:,np.newaxis]+b_sum_square-2*mul
-    return dists
-
-def make_test_vectors():
-    l = []
-    for i in range(5):
-        l.append([])
-        for j in range(3):
-            l[i].append(i*5+j)
-    C = tf.constant(l)
-    l = []
-    for i in range(10):
-        l.append([])
-        for j in range(3):
-            l[i].append(i*5+j)
-    D = tf.constant(l)
-    return [C, D]
+    #split into K clusters, in this case 3 and find minimum
+    split0, split1, split2 = tf.split(1, 3, dists)
+    mins = tf.minimum(split0, split1)
+    mins = tf.minimum(mins, split2)
+    return mins
 
 def task1():
     data = np.load("data2D.npy")
@@ -57,44 +38,52 @@ def task1():
         l = []
         for i in range(5):
             l.append([])
-            for j in range(3):
-                l[i].append(i*5+j)
+            for j in range(2):
+                to_add = np.float64(i*5+j)
+                l[i].append(to_add)
         C = tf.constant(l)
         l = []
         for i in range(10):
             l.append([])
-            for j in range(3):
-                l[i].append(i*5+j)
+            for j in range(2):
+                to_add = np.float64(i*5+j)
+                l[i].append(to_add)
         D = tf.constant(l)
 
+
+
+        #randomly set k means
+        #means = tf.Variable(tf.truncated_normal([3, 2], dtype=tf.float32))
+
+        #set 0s to compare euclidean distances against
+        labels = tf.Variable(tf.zeros([10000, 1], dtype=tf.float32))
+        means = tf.placeholder(tf.float32, shape=(3, 2))
+
+        #data has B samples by D=2
+        dat = tf.constant(data, dtype=tf.float32)
+        logits = euclideanDistance(dat, means)
+        loss = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(logits, labels))
+        mean_prediction = tf.nn.softmax(logits)
+        #optimizer = tf.train.AdamOptimizer(0.1).minimize(loss)
+        optimizer = tf.train.AdamOptimizer(0.1, 0.9, 0.99, 0.00001).minimize(loss)
+
+    num_steps = 3
     with tf.Session(graph=graph) as session:
         tf.initialize_all_variables().run()
-        x = A.eval()
-        print(C.eval())
-        print(tf.transpose(D).eval())
-        #takes in 2 matrices BxD and KxD
+        all_means = tf.Variable(tf.truncated_normal([3, 2], dtype=tf.float32))
+        #for step in range(num_steps):
+        rslt = euclideanDistance(dat,means)
+        print(rslt.eval())
+        for step in range(num_steps):
+            print(means.eval())
+            feed_dict = {means: all_means}
+            _, l, predictions = session.run([optimizer, loss, mean_prediction], feed_dict=feed_dict)
+            #takes in 2 matrices BxD and KxD
 
-        print(euclideanDistance(C,D).eval())
-        a = np.array([[1,1,1,1],[2,2,2,2]])
-        b = np.array([[1,2,3,4],[1,1,1,1],[1,2,1,9]])
 
-        #square all elements of both matrices
-        a_squared = np.square(a)
-        b_squared = np.square(b)
-        #sum all squares of EACH sample
-        a_sum_square = np.sum(a_squared,axis=1)
-        b_sum_square = np.sum(b_squared,axis=1)
-        #multiply each sample by each cluster
-        mul = np.dot(a,b.T)
-        print(a_sum_square)
-        print(a_sum_square[:,np.newaxis])
-        dists = a_sum_square[:,np.newaxis]+b_sum_square-2*mul
-
-        #print(nump_compute_dist(a,b))
 
 if __name__ == "__main__":
     data = np.load("data2D.npy")
-    #for i in range(len(data)):
-     #   print(data[i])
     print(data)
     task1()
