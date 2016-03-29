@@ -2,6 +2,7 @@
 # before proceeding further.
 from __future__ import print_function
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import os
 import sys
@@ -207,6 +208,197 @@ def task6():
         #call task1 with randomized parameters
         task1(hidden_units_per_layer, learning_rate, num_layers, dropout)
 
+def task7():
+    # x and y are placeholders for our training data
+    x = tf.placeholder("float")
+    y = tf.placeholder("float")
+    # w is the variable storing our values. It is initialised with starting "guesses"
+    # w[0] is the "a" in our equation, w[1] is the "b"
+    w = tf.Variable([1.0, 2.0], name="w")
+    # Our model of y = a*x + b
+    y_model = tf.mul(x, w[0]) + w[1]
+
+    # Our error is defined as the square of the differences
+    error = tf.square(y - y_model)
+    # The Gradient Descent Optimizer does the heavy lifting
+    train_op = tf.train.GradientDescentOptimizer(0.01).minimize(error)
+
+    # Normal TensorFlow - initialize values, create a session and run the model
+    model = tf.initialize_all_variables()
+
+    with tf.Session() as session:
+        session.run(model)
+        for i in range(1000):
+            x_value = np.random.rand()
+            y_value = x_value * 2 + 6
+            session.run(train_op, feed_dict={x: x_value, y: y_value})
+
+        w_value = session.run(w)
+        print("Predicted model: {a:.3f}x + {b:.3f}".format(a=w_value[0], b=w_value[1]))
+
+
+NHIDDEN = 24
+STDEV = 0.5
+KMIX = 2 # number of mixtures
+NOUT = KMIX * 3 # pi, mu, stdev
+
+x = tf.placeholder(dtype=tf.float32, shape=[None,1], name="x")
+y = tf.placeholder(dtype=tf.float32, shape=[None,1], name="y")
+
+Wh = tf.Variable(tf.random_normal([1,NHIDDEN], stddev=STDEV, dtype=tf.float32))
+bh = tf.Variable(tf.random_normal([1,NHIDDEN], stddev=STDEV, dtype=tf.float32))
+
+Wo = tf.Variable(tf.random_normal([NHIDDEN,NOUT], stddev=STDEV, dtype=tf.float32))
+bo = tf.Variable(tf.random_normal([1,NOUT], stddev=STDEV, dtype=tf.float32))
+
+hidden_layer = tf.nn.tanh(tf.matmul(x, Wh) + bh)
+output = tf.matmul(hidden_layer,Wo) + bo
+
+def get_mixture_coef(output):
+  out_pi = tf.placeholder(dtype=tf.float32, shape=[None,KMIX], name="mixparam")
+  out_sigma = tf.placeholder(dtype=tf.float32, shape=[None,KMIX], name="mixparam")
+  out_mu = tf.placeholder(dtype=tf.float32, shape=[None,KMIX], name="mixparam")
+
+  out_pi, out_sigma, out_mu = tf.split(1, 3, output)
+
+  max_pi = tf.reduce_max(out_pi, 1, keep_dims=True)
+  out_pi = tf.sub(out_pi, max_pi)
+
+  out_pi = tf.exp(out_pi)
+
+  normalize_pi = tf.inv(tf.reduce_sum(out_pi, 1, keep_dims=True))
+  out_pi = tf.mul(normalize_pi, out_pi)
+
+  out_sigma = tf.exp(out_sigma)
+
+  return out_pi, out_sigma, out_mu
+
+out_pi, out_sigma, out_mu = get_mixture_coef(output)
+
+NSAMPLE = 2500
+
+y_data = np.float32(np.random.uniform(-10.5, 10.5, (1, NSAMPLE))).T
+r_data = np.float32(np.random.normal(size=(NSAMPLE,1))) # random noise
+x_data = np.float32(np.sin(0.75*y_data)*7.0+y_data*0.5+r_data*1.0)
+
+plt.figure(figsize=(8, 8))
+plt.plot(x_data,y_data,'ro', alpha=0.3)
+plt.show()
+
+x_test = np.float32(np.arange(-15,15,0.1))
+NTEST = x_test.size
+x_test = x_test.reshape(NTEST,1) # needs to be a matrix, not a vector
+
+def show_clusters(assigns, vdata, colors):
+    d = {}
+    for i, num in enumerate(assigns):
+        if(d.has_key(num)):
+            d[num][0].append(vdata[i][0])
+            d[num][1].append(vdata[i][1])
+        else:
+            d[num] = [[vdata[i][0]], [vdata[i][1]]]
+    clusters = []
+    for key in d:
+        percentage = str(100*float(len(d[key][0]))/float(len(vdata))) + "%"
+        clusters.append(plt.scatter(d[key][0], d[key][1], color=colors[key], label=percentage))
+    plt.legend()
+
+def assign_to_nearest_prob(samples, probs):
+    assigns = []
+    print(len(probs))
+    print(len(samples))
+    for i in range(len(probs)):
+        hp_index = 0
+        hp = probs[i][0]
+        for j in range(1, len(probs[i])):
+            p = probs[i][j]
+            if p > hp:
+                hp = p
+                hp_index = j
+        assigns.append(hp_index)
+    return assigns
+
+oneDivSqrtTwoPI = 1 / math.sqrt(2*math.pi) # normalisation factor for gaussian, not needed.
+def tf_normal(y, mu, sigma):
+  result = tf.sub(y, mu)
+  result = tf.mul(result,tf.inv(sigma))
+  result = -tf.square(result)/2
+  return tf.mul(tf.exp(result),tf.inv(sigma))*oneDivSqrtTwoPI
+
+def get_lossfunc(out_pi, out_sigma, out_mu, y):
+  result = tf_normal(y, out_mu, out_sigma)
+  result = tf.mul(result, out_pi)
+  result = tf.reduce_sum(result, 1, keep_dims=True)
+  result = -tf.log(result)
+  return tf.reduce_mean(result)
+
+def get_pi_idx(x, pdf):
+  N = pdf.size
+  accumulate = 0
+  for i in range(0, N):
+    accumulate += pdf[i]
+    if accumulate >= x:
+      return i
+  print('error with sampling ensemble')
+  return -1
+
+def generate_ensemble(out_pi, out_mu, out_sigma, M = 10):
+  NTEST = x_test.size
+  result = np.random.rand(NTEST, M) # initially random [0, 1]
+  rn = np.random.randn(NTEST, M) # normal random matrix (0.0, 1.0)
+  mu = 0
+  std = 0
+  idx = 0
+
+  # transforms result into random ensembles
+  for j in range(0, M):
+    for i in range(0, NTEST):
+      idx = get_pi_idx(result[i, j], out_pi[i])
+      mu = out_mu[i, idx]
+      std = out_sigma[i, idx]
+      result[i, j] = mu + rn[i, j]*std
+  return result
+
+lossfunc = get_lossfunc(out_pi, out_sigma, out_mu, y)
+train_op = tf.train.AdamOptimizer().minimize(lossfunc)
+
+def task8():
+    sess = tf.InteractiveSession()
+    sess.run(tf.initialize_all_variables())
+
+    NEPOCH = 10000
+    loss = np.zeros(NEPOCH) # store the training progress here.
+    for i in range(NEPOCH):
+      _, out_pi_test, out_sigma_test, out_mu_test = sess.run([train_op, out_pi, out_sigma, out_mu],feed_dict={x: x_data, y: y_data})
+      loss[i] = sess.run(lossfunc, feed_dict={x: x_data, y: y_data})
+
+    plt.figure(figsize=(8, 8))
+    plt.plot(np.arange(100, NEPOCH,1), loss[100:], 'r-')
+    plt.show()
+
+    #out_pi_test2, out_sigma_test2, out_mu_test2 = sess.run(get_mixture_coef(output), feed_dict={x: x_test})
+
+    dat = []
+    for i in range(len(x_data)):
+        dat.append([x_data[i][0], y_data[i][0]])
+    print(len(out_pi_test))
+    print(dat)
+    assigns = assign_to_nearest_prob(dat, out_pi_test)
+    print(assigns)
+    colors = []
+    for name, hex in matplotlib.colors.cnames.iteritems():
+        colors.append(name)
+    print(colors)
+    show_clusters(assigns, dat, colors)
+    plt.show()
+
+    '''y_test = generate_ensemble(out_pi_test2, out_mu_test2, out_sigma_test2)
+
+    plt.figure(figsize=(8, 8))
+    plt.plot(x_data,y_data,'ro', x_test,y_test,'bo',alpha=0.3)
+    plt.show()'''
+
+
 if __name__ == "__main__":
     with np.load("notMNIST.npz") as data:
         images , labels = data["images"], data["labels"]
@@ -239,3 +431,5 @@ if __name__ == "__main__":
     #task4()
     #task5()
     #task6()
+    #task7()
+    task8()
